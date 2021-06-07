@@ -1,0 +1,5 @@
+pyTelegramBotAPI==3.7.9
+vosk==0.3.29
+pyttsx3==2.90
+pymongo==3.11.4
+mongoengine==0.23.1
