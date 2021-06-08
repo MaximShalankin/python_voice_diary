@@ -130,3 +130,5 @@ dmypy.json
 
 # custom
 .DS_Store
+vosk-model-ru-0.10/
+.idea/
