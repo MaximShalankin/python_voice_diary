@@ -132,3 +132,5 @@ dmypy.json
 .DS_Store
 vosk-model-ru-0.10/
 .idea/
+*.ipynb
+user_logs/
