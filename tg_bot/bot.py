@@ -1,8 +1,15 @@
 import os
-import pymongo
-import telebot
+import datetime
 from subprocess import check_call
-from telebot import InlineKeyboardMarkup, InlineKeyboardButton
+
+import pymongo
+import vosk
+import telebot
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+from tg_bot.voice_module import recognize_phrase
+from database.db_functions import add_value, find_value, find_last_values, del_value
+from database.time_processing import get_time_interval, timestamp_to_date, date_to_timestamp
 
 
 class TGBot:
@@ -11,6 +18,7 @@ class TGBot:
             self,
             token: str,
             database: pymongo.collection.Collection,
+            voice_model: vosk.Model,
             special_chat_id: int = None
     ):
 
@@ -18,6 +26,7 @@ class TGBot:
         self.database = database
         self.special_chat_id = special_chat_id
         self.bot = telebot.TeleBot(token, threaded=False)
+        self.voice_model = voice_model
 
     def add_handlers(self):
 
@@ -38,10 +47,13 @@ class TGBot:
             command = f"ffmpeg -i {path_user_logs}/my_phrase.ogg -vn -ar 16000 -ac 2 -ab 192 -f wav {path_user_logs}/my_phrase_to_translite.wav"
             _ = check_call(command.split())
 
-            user_phrase = recognize_phrase(f'{path_user_logs}/my_phrase_to_translite.wav')
-            self.bot.send_message(message.chat.id, user_phrase)
+            user_phrase = recognize_phrase(self.voice_model, f'{path_user_logs}/my_phrase_to_translite.wav')
+            add_value(self.database, user_phrase)
             self.bot.reply_to(message,
                               f"Твое сообщение сохранено! Дата: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+            os.remove(f'{path_user_logs}/my_phrase.ogg')
+            os.remove(f'{path_user_logs}/my_phrase_to_translite.wav')
 
         @self.bot.message_handler(commands=['menu'])
         def main_menu(message):
@@ -92,7 +104,6 @@ class TGBot:
             elif call.data == "pass":
                 self.bot.answer_callback_query(callback_query_id=call.id, show_alert=False, text="Ну и отлично!")
 
-
             elif call.data == "delete_last_n":
                 msg = self.bot.send_message(call.message.chat.id, 'Введи число записей, которые хочешь удалить')
                 self.bot.register_next_step_handler(msg, delete_last_n)
@@ -112,25 +123,38 @@ class TGBot:
                 self.bot.register_next_step_handler(msg, find_interval)
 
         # main handlers
-        def delete_last_n(message):  # TODO
+        def delete_last_n(message):
             user_answer = message.text
 
             if not user_answer.isdigit():
-                self.bot.send_message(message.chat.id, 'Необходимо ввести число')
+                self.bot.send_message(message.chat.id, 'необходимо ввести число')
                 return
 
-            self.bot.send_message(message.chat.id, 'delete_last_n ' + user_answer)
+            last_values = find_last_values(self.database, int(user_answer))
+            last_idx, first_idx = last_values[0]['_id'], last_values[-1]['_id']
+            del_value(self.database, first_idx, last_idx)
+            self.bot.send_message(message.chat.id, 'удалено!')
 
-        def delete_interval(message):  # TODO
+        def delete_interval(message):
             user_answer = message.text
 
-            if not user_answer.isdigit():
-                self.bot.send_message(message.chat.id, 'Необходимо ввести число')
+            if user_answer == '1':  # 10 минут
+                use_interval = get_time_interval(int(datetime.datetime.now().timestamp()), 10)
+
+            elif user_answer == '2':  # 60 минут
+                use_interval = get_time_interval(int(datetime.datetime.now().timestamp()), 60)
+
+            elif user_answer == '3':  # 1440 минут
+                use_interval = get_time_interval(int(datetime.datetime.now().timestamp()), 1440)
+
+            else:
+                self.bot.send_message(message.chat.id, 'введено некорректное значение')
                 return
 
-            self.bot.send_message(message.chat.id, 'delete_interval ' + user_answer)
+            del_value(self.database, use_interval[0], use_interval[1])
+            self.bot.send_message(message.chat.id, 'удалено!')
 
-        def find_last_n(message):  # DONE
+        def find_last_n(message):
             user_answer = message.text
 
             if not user_answer.isdigit():
@@ -140,7 +164,7 @@ class TGBot:
             for result in find_last_values(self.database, int(user_answer)):
                 self.bot.send_message(message.chat.id, timestamp_to_date(result['_id']) + '\n' + result['text'])
 
-        def find_interval(message):  # DONE
+        def find_interval(message):
             user_answer = message.text
 
             if user_answer == '1':  # 10 минут

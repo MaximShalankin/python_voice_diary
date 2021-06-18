@@ -134,3 +134,4 @@ vosk-model-ru-0.10/
 .idea/
 *.ipynb
 user_logs/
+credentials*
