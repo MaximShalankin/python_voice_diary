@@ -4,7 +4,7 @@ from tg_bot.bot import TGBot
 from database import DIARY_DB
 from tg_bot import VOICE_MODEL
 
-with open('credentials.json', 'r') as file:
+with open('voice_diary/credentials.json', 'r') as file:
     credentials = json.load(file)
 
 
