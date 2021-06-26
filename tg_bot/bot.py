@@ -44,7 +44,7 @@ class TGBot:
                 new_file.write(downloaded_file)
 
             # convert oog to wav
-            command = f"ffmpeg -i {path_user_logs}/my_phrase.ogg -vn -ar 16000 -ac 2 -ab 192K -f wav {path_user_logs}/my_phrase_to_translite.wav"
+            command = f"ffmpeg -i {path_user_logs}/my_phrase.ogg -ar 16000 -ac 2 -ab 192K -f wav {path_user_logs}/my_phrase_to_translite.wav"
             _ = check_call(command.split())
 
             user_phrase = recognize_phrase(self.voice_model, f'{path_user_logs}/my_phrase_to_translite.wav')
